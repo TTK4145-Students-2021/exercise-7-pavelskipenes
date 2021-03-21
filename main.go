@@ -7,72 +7,54 @@ import (
 	"time"
 )
 
-type State int
-
-const (
-	primary   = 0
-	secondary = 1
-)
-
 func main() {
-	go sender("Numbers!")
-	go receiver()
-	for {
+	var global_counter = 0 // default
 
+	// listener setup
+	pc_listener, err := net.ListenPacket("udp4", ":42069")
+	if err != nil {
+		panic(err)
 	}
-	var state State
-	state = secondary
-	var global_counter = 0
+	defer pc_listener.Close()
+	buf_listener := make([]byte, 1024)
 
-	fmt.Println("Joining as secondary")
-	// TODO: set up a udp listener
+	// go watchdog to kill listener
+	listen(pc_listener, buf_listener)
 
-	for state == secondary {
-		// TODO: observe the network
-		// TODO: save global value to variable
-		// TODO: break if primary is not detected
-	}
 	// launch a new instance
 	exec.Command("go run ./main.go").Run()
+
+	// broadcast UDP setup
+	pc_broadcast, err := net.ListenPacket("udp4", "") // automatic port number
+	if err != nil {
+		panic(err)
+	}
+	defer pc_broadcast.Close()
+
+	addr_broadcast, err := net.ResolveUDPAddr("udp4", "255.255.255.255:42069")
+	if err != nil {
+		panic(err)
+	}
 
 	// TODO: count to the network
 	for {
 		global_counter++
 		time.Sleep(5 * time.Second)
-		// TODO: broadcast(global_counter)
+		send(pc_broadcast, addr_broadcast, fmt.Sprint(global_counter))
 	}
 }
 
-func sender(message string) {
-	for {
+func send(pc net.PacketConn, addr *net.UDPAddr, message string) {
 
-		pc, err := net.ListenPacket("udp4", "") // automatic port number
-		if err != nil {
-			panic(err)
-		}
-		defer pc.Close()
-
-		addr, err := net.ResolveUDPAddr("udp4", "255.255.255.255:8829")
-		if err != nil {
-			panic(err)
-		}
-
-		n, err := pc.WriteTo([]byte(message), addr)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(n)
-		time.Sleep(3 * time.Second)
-	}
-}
-
-func receiver() {
-	pc, err := net.ListenPacket("udp4", ":8829")
+	n, err := pc.WriteTo([]byte(message), addr)
 	if err != nil {
 		panic(err)
 	}
-	defer pc.Close()
-	buf := make([]byte, 1024)
+	_ = n // supress var not used warning
+}
+
+func listen(pc net.PacketConn, buf []byte) {
+	// TODO: save the read value to var in main scope
 
 	for {
 
