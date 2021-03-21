@@ -37,20 +37,28 @@ func main() {
 	}
 
 	// TODO: count to the network
+	message := make(chan string)
+	go sender(pc_broadcast, addr_broadcast, message)
 	for {
 		global_counter++
 		time.Sleep(5 * time.Second)
-		send(pc_broadcast, addr_broadcast, fmt.Sprint(global_counter))
+		message <- fmt.Sprint(global_counter)
+
 	}
 }
 
-func send(pc net.PacketConn, addr *net.UDPAddr, message string) {
+func sender(pc net.PacketConn, addr *net.UDPAddr, message <-chan string) {
+	for {
+		select {
 
-	n, err := pc.WriteTo([]byte(message), addr)
-	if err != nil {
-		panic(err)
+		case msg := <-message:
+			n, err := pc.WriteTo([]byte(msg), addr)
+			if err != nil {
+				panic(err)
+			}
+			_ = n // supress var not used warning
+		}
 	}
-	_ = n // supress var not used warning
 }
 
 func listen(pc net.PacketConn, buf []byte) {
